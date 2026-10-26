@@ -16,6 +16,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -32,6 +33,13 @@ type Vendor interface {
 	// Fail makes the vendor's next request fail as f describes. It reports
 	// false when the double cannot simulate f.
 	Fail(f Failure) bool
+}
+
+// StatusSetter is implemented by a vendor double that can change a ticket's
+// status as a responder would at the desk. The status check uses it when
+// present.
+type StatusSetter interface {
+	SetStatus(d supportcore.Delivery, s supportcore.Status) bool
 }
 
 // Ticket is what a vendor holds for one ticket, split by who can see it.
@@ -119,6 +127,9 @@ var checks = []check{
 	{"ClassifiesCancellation", checkClassifiesCancellation},
 	{"ErasesTickets", checkErases},
 	{"ExportsTickets", checkExports},
+	{"LinksWithoutPersonalData", checkLinks},
+	{"ReportsStatus", checkStatus},
+	{"Replies", checkReplies},
 }
 
 // Distinct markers, so a check can tell where each part of a case went.
@@ -128,6 +139,9 @@ const (
 	markContext    = "desktest-context-5d70"
 	markAckSubject = "desktest-ack-subject-1b4e"
 	markAckBody    = "desktest-ack-body-6e02"
+	markReply      = "desktest-reply-0a93"
+	replyTo        = "requester@example.com"
+	missingTicket  = "desktest-missing-ticket"
 )
 
 func signedInCase(id string) supportcore.Case {
@@ -143,7 +157,7 @@ func signedInCase(id string) supportcore.Case {
 		Requester: supportcore.Requester{
 			PrincipalID:    "principal-1",
 			OrganizationID: "organization-1",
-			ReplyTo:        "requester@example.com",
+			ReplyTo:        replyTo,
 		},
 		CreatedAt: time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC),
 	}
@@ -357,6 +371,100 @@ func checkExports(ctx context.Context, desk supportcore.Desk, v Vendor) error {
 		if !containsAny(bodies, mark) {
 			return fmt.Errorf("the transcript lacks %q", mark)
 		}
+	}
+	return nil
+}
+
+func checkLinks(ctx context.Context, desk supportcore.Desk, v Vendor) error {
+	linker, ok := desk.(supportcore.TicketLinker)
+	if !ok {
+		return skipError("the desk does not implement TicketLinker")
+	}
+	d, _, err := deliver(ctx, desk, v, signedInCase("c1"))
+	if err != nil {
+		return err
+	}
+	link, err := linker.TicketURL(ctx, d)
+	if err != nil {
+		return fmt.Errorf("TicketURL: %w", err)
+	}
+	if link == "" {
+		return nil
+	}
+	u, err := url.Parse(link)
+	if err != nil {
+		return fmt.Errorf("TicketURL returned %q: %w", link, err)
+	}
+	if (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" {
+		return fmt.Errorf("TicketURL returned %q, which is not an absolute web address", link)
+	}
+	// An escaped address such as requester%40example.com is still the address.
+	unescaped, err := url.QueryUnescape(link)
+	if err != nil {
+		unescaped = link // malformed escapes; check the link as it is
+	}
+	for _, mark := range []string{markTitle, markBody, markContext, replyTo} {
+		if strings.Contains(link, mark) || strings.Contains(unescaped, mark) {
+			return fmt.Errorf("TicketURL returned %q, which contains %q", link, mark)
+		}
+	}
+	return nil
+}
+
+func checkStatus(ctx context.Context, desk supportcore.Desk, v Vendor) error {
+	reporter, ok := desk.(supportcore.TicketStatuser)
+	if !ok {
+		return skipError("the desk does not implement TicketStatuser")
+	}
+	d, _, err := deliver(ctx, desk, v, signedInCase("c1"))
+	if err != nil {
+		return err
+	}
+	s, err := reporter.TicketStatus(ctx, d)
+	if err != nil {
+		return fmt.Errorf("TicketStatus: %w", err)
+	}
+	if !s.Valid() || s == supportcore.StatusClosed {
+		return fmt.Errorf("TicketStatus of a new ticket = %q, want open or pending", s)
+	}
+	setter, ok := v.(StatusSetter)
+	if !ok || !setter.SetStatus(d, supportcore.StatusClosed) {
+		return nil
+	}
+	if s, err = reporter.TicketStatus(ctx, d); err != nil {
+		return fmt.Errorf("TicketStatus after closing: %w", err)
+	}
+	if s != supportcore.StatusClosed {
+		return fmt.Errorf("TicketStatus after closing = %q, want closed", s)
+	}
+	return nil
+}
+
+func checkReplies(ctx context.Context, desk supportcore.Desk, v Vendor) error {
+	replier, ok := desk.(supportcore.TicketReplier)
+	if !ok {
+		return skipError("the desk does not implement TicketReplier")
+	}
+	d, _, err := deliver(ctx, desk, v, signedInCase("c1"))
+	if err != nil {
+		return err
+	}
+	if err := replier.Reply(ctx, d, markReply); err != nil {
+		return fmt.Errorf("Reply: %w", err)
+	}
+	tk, ok := v.Ticket(d)
+	if !ok {
+		return fmt.Errorf("the vendor no longer holds ticket %q after Reply", d.TicketID)
+	}
+	if !containsAny(tk.Sent, markReply) {
+		return errors.New("the requester was not sent the reply")
+	}
+	if !containsAny(tk.Responders, markReply) {
+		return errors.New("responders cannot see the reply")
+	}
+	missing := supportcore.Delivery{Desk: desk.Name(), TicketID: missingTicket}
+	if err := replier.Reply(ctx, missing, markReply); supportcore.Classify(err) != supportcore.ErrRejected {
+		return fmt.Errorf("Reply to a ticket that does not exist returned %v; want ErrRejected", err)
 	}
 	return nil
 }
