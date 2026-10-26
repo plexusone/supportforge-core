@@ -31,7 +31,7 @@ is that host.
 
 | Package | Holds |
 | --- | --- |
-| `supportcore` (module root) | `Case`, `Requester`, `Acknowledgment`, `Context`, `Delivery`, `Transcript`; the `Desk` interface and its optional `TicketEraser` and `TicketExporter` extensions; the error classes |
+| `supportcore` (module root) | `Case`, `Requester`, `Acknowledgment`, `Context`, `Delivery`, `Transcript`; `Status`; the `Desk` interface and its optional extensions; the error classes |
 | `desktest` | The conformance suite every desk should pass |
 | `memdesk` | An in-memory desk for tests, which passes the suite |
 
@@ -58,8 +58,15 @@ A desk keeps these rules:
 - **Deliver may be retried** for a case already delivered, so use the case's
   ID as an idempotency key where the vendor accepts one.
 
-Implement `TicketEraser` and `TicketExporter` where the vendor allows, so a
-requester's erasure and data export reach the desk.
+Implement the optional extensions where the vendor allows:
+
+| Extension | Lets the host |
+| --- | --- |
+| `TicketEraser` | Delete the ticket when a requester's data is erased |
+| `TicketExporter` | Include the conversation in a requester's data export |
+| `TicketLinker` | Link the requester to a page where they can follow the ticket |
+| `TicketStatuser` | Show whether the ticket is open, pending or closed |
+| `TicketReplier` | Send a reply into the ticket's conversation |
 
 ## Testing a desk
 
@@ -77,7 +84,8 @@ func TestConformance(t *testing.T) {
 
 The suite checks delivery, the acknowledgment, that nothing else reaches the
 requester, what responders see, cases with no reply address, error
-classification, cancellation, and erasure and export where implemented.
+classification and cancellation, and each extension where implemented:
+erasure, export, links free of personal data, status, and replies.
 
 ## Stability
 
