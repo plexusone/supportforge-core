@@ -111,6 +111,24 @@ type Delivery struct {
 	TicketID string // the desk's own identifier
 }
 
+// Status is a ticket's state at the desk.
+type Status string
+
+const (
+	StatusOpen    Status = "open"    // waiting for a responder
+	StatusPending Status = "pending" // waiting for the requester
+	StatusClosed  Status = "closed"
+)
+
+// Valid reports whether s is one of the statuses above.
+func (s Status) Valid() bool {
+	switch s {
+	case StatusOpen, StatusPending, StatusClosed:
+		return true
+	}
+	return false
+}
+
 // Author is who wrote a message in a ticket's transcript.
 type Author string
 

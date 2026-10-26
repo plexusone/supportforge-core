@@ -44,3 +44,26 @@ type TicketEraser interface {
 type TicketExporter interface {
 	ExportTicket(ctx context.Context, d Delivery) (Transcript, error)
 }
+
+// TicketLinker is implemented by a desk that has a page where the requester
+// can sign in and follow their ticket, such as a help center. The URL
+// carries no personal data. A desk returns "" for a ticket with no such
+// page.
+type TicketLinker interface {
+	TicketURL(ctx context.Context, d Delivery) (string, error)
+}
+
+// TicketStatuser is implemented by a desk that can report a ticket's
+// status, so the requester's list is current and the host knows when a
+// conversation has ended.
+type TicketStatuser interface {
+	TicketStatus(ctx context.Context, d Delivery) (Status, error)
+}
+
+// TicketReplier is implemented by a desk that can send a reply into a
+// ticket's conversation. The body goes to the requester, and responders see
+// it in the ticket. A desk returns [ErrRejected] when the ticket no longer
+// exists or has no address to reply to.
+type TicketReplier interface {
+	Reply(ctx context.Context, d Delivery, body string) error
+}
