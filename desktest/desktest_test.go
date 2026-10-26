@@ -46,8 +46,13 @@ func (v memVendor) Fail(f Failure) bool {
 	return true
 }
 
+func (v memVendor) SetStatus(d supportcore.Delivery, s supportcore.Status) bool {
+	return v.desk.SetStatus(d.TicketID, s)
+}
+
 func newMemDesk(*testing.T) (supportcore.Desk, Vendor) {
 	d := memdesk.New("")
+	d.SetPortal("https://desk.example.com/portal/tickets/")
 	return d, memVendor{d}
 }
 
@@ -110,6 +115,39 @@ func (d ignoresContextDesk) Deliver(_ context.Context, c supportcore.Case, ack s
 	return d.Desk.Deliver(context.Background(), c, ack, p)
 }
 
+// leakyLinkDesk puts the requester's address in its link.
+type leakyLinkDesk struct{ *memdesk.Desk }
+
+func (d leakyLinkDesk) TicketURL(context.Context, supportcore.Delivery) (string, error) {
+	return "https://desk.example.com/tickets?email=requester%40example.com", nil
+}
+
+// relativeLinkDesk returns a link that is not absolute.
+type relativeLinkDesk struct{ *memdesk.Desk }
+
+func (relativeLinkDesk) TicketURL(context.Context, supportcore.Delivery) (string, error) {
+	return "/tickets/1", nil
+}
+
+// closedDesk reports every ticket closed.
+type closedDesk struct{ *memdesk.Desk }
+
+func (closedDesk) TicketStatus(context.Context, supportcore.Delivery) (supportcore.Status, error) {
+	return supportcore.StatusClosed, nil
+}
+
+// staleStatusDesk never notices a ticket was closed.
+type staleStatusDesk struct{ *memdesk.Desk }
+
+func (staleStatusDesk) TicketStatus(context.Context, supportcore.Delivery) (supportcore.Status, error) {
+	return supportcore.StatusOpen, nil
+}
+
+// silentReplyDesk records a reply without sending it.
+type silentReplyDesk struct{ *memdesk.Desk }
+
+func (silentReplyDesk) Reply(context.Context, supportcore.Delivery, string) error { return nil }
+
 // keepsTicketsDesk claims erasure but does not erase.
 type keepsTicketsDesk struct{ *memdesk.Desk }
 
@@ -130,6 +168,11 @@ func TestChecksCatchBrokenDesks(t *testing.T) {
 		{"ClassifiesVendorErrors", func(d *memdesk.Desk) (supportcore.Desk, Vendor) { return d, noFailVendor{memVendor{d}} }, "simulates no failure"},
 		{"ClassifiesCancellation", func(d *memdesk.Desk) (supportcore.Desk, Vendor) { return ignoresContextDesk{d}, memVendor{d} }, "canceled context"},
 		{"ErasesTickets", func(d *memdesk.Desk) (supportcore.Desk, Vendor) { return keepsTicketsDesk{d}, memVendor{d} }, "still holds"},
+		{"LinksWithoutPersonalData", func(d *memdesk.Desk) (supportcore.Desk, Vendor) { return leakyLinkDesk{d}, memVendor{d} }, replyTo},
+		{"LinksWithoutPersonalData", func(d *memdesk.Desk) (supportcore.Desk, Vendor) { return relativeLinkDesk{d}, memVendor{d} }, "not an absolute"},
+		{"ReportsStatus", func(d *memdesk.Desk) (supportcore.Desk, Vendor) { return closedDesk{d}, memVendor{d} }, "new ticket"},
+		{"ReportsStatus", func(d *memdesk.Desk) (supportcore.Desk, Vendor) { return staleStatusDesk{d}, memVendor{d} }, "after closing"},
+		{"Replies", func(d *memdesk.Desk) (supportcore.Desk, Vendor) { return silentReplyDesk{d}, memVendor{d} }, "not sent the reply"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.check+"/"+tt.want, func(t *testing.T) {
@@ -149,7 +192,7 @@ func TestOptionalChecksSkip(t *testing.T) {
 	// Embedding only the Desk interface hides memdesk's extensions.
 	type plainDesk struct{ supportcore.Desk }
 	d := memdesk.New("")
-	for _, name := range []string{"ErasesTickets", "ExportsTickets"} {
+	for _, name := range []string{"ErasesTickets", "ExportsTickets", "LinksWithoutPersonalData", "ReportsStatus", "Replies"} {
 		err := find(t, name).run(t.Context(), plainDesk{d}, memVendor{d})
 		var skip skipError
 		if !errors.As(err, &skip) {

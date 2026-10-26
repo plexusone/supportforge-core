@@ -23,6 +23,19 @@ func TestKinds(t *testing.T) {
 	}
 }
 
+func TestStatus(t *testing.T) {
+	for _, s := range []supportcore.Status{supportcore.StatusOpen, supportcore.StatusPending, supportcore.StatusClosed} {
+		if !s.Valid() {
+			t.Errorf("%q is not valid", s)
+		}
+	}
+	for _, s := range []supportcore.Status{"", "delivered", "Closed"} {
+		if s.Valid() {
+			t.Errorf("%q is valid", s)
+		}
+	}
+}
+
 func TestVisitor(t *testing.T) {
 	if !(supportcore.Requester{ReplyTo: "a@example.com"}).Visitor() {
 		t.Error("a requester without a principal is not a visitor")

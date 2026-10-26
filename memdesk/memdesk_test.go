@@ -131,3 +131,54 @@ func TestConcurrentDelivery(t *testing.T) {
 		t.Errorf("Len = %d, want 20", d.Len())
 	}
 }
+
+func TestLinkStatusAndReply(t *testing.T) {
+	d := memdesk.New("")
+	del, err := d.Deliver(t.Context(), testCase(), supportcore.Acknowledgment{}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if link, err := d.TicketURL(t.Context(), del); err != nil || link != "" {
+		t.Errorf("TicketURL without a portal = %q, %v", link, err)
+	}
+	d.SetPortal("https://desk.example.com/t/")
+	if link, err := d.TicketURL(t.Context(), del); err != nil || link != "https://desk.example.com/t/"+del.TicketID {
+		t.Errorf("TicketURL = %q, %v", link, err)
+	}
+	if s, err := d.TicketStatus(t.Context(), del); err != nil || s != supportcore.StatusOpen {
+		t.Errorf("TicketStatus = %q, %v", s, err)
+	}
+	if err := d.Reply(t.Context(), del, "Use the export page."); err != nil {
+		t.Fatal(err)
+	}
+	tk, ok := d.Ticket(del.TicketID)
+	if !ok {
+		t.Fatal("the ticket is gone")
+	}
+	if tk.Status != supportcore.StatusPending || len(tk.Sent) != 2 || tk.Sent[1].Body != "Use the export page." {
+		t.Errorf("ticket after Reply = %+v", tk)
+	}
+	if !d.SetStatus(del.TicketID, supportcore.StatusClosed) || d.SetStatus("missing", supportcore.StatusClosed) {
+		t.Error("SetStatus reported the wrong result")
+	}
+}
+
+func TestReplyRejected(t *testing.T) {
+	d := memdesk.New("")
+	c := testCase()
+	c.Requester.ReplyTo = ""
+	del, err := d.Deliver(t.Context(), c, supportcore.Acknowledgment{}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := d.Reply(t.Context(), del, "hi"); !errors.Is(err, supportcore.ErrRejected) {
+		t.Errorf("Reply without an address = %v, want ErrRejected", err)
+	}
+	if err := d.Reply(t.Context(), supportcore.Delivery{TicketID: "missing"}, "hi"); !errors.Is(err, supportcore.ErrRejected) {
+		t.Errorf("Reply to a missing ticket = %v, want ErrRejected", err)
+	}
+	d.FailNext(supportcore.ErrCredential)
+	if _, err := d.TicketStatus(t.Context(), del); !errors.Is(err, supportcore.ErrCredential) {
+		t.Errorf("TicketStatus = %v, want the injected error", err)
+	}
+}
