@@ -1,0 +1,56 @@
+{
+  "irVersion": "1.0",
+  "project": "supportforge-core",
+  "repository": "https://github.com/plexusone/supportforge-core",
+  "versioning": "semver",
+  "commitConvention": "conventional",
+  "maintainers": [
+    "plexusone"
+  ],
+  "releases": [
+    {
+      "version": "v0.1.0",
+      "date": "2026-10-26",
+      "highlights": [
+        {
+          "description": "A dependency-free interface between a support-request system and any help desk, with a conformance suite that proves a desk keeps the contract"
+        }
+      ],
+      "added": [
+        {
+          "description": "`Case`, `Requester`, `Acknowledgment`, `Context`, `Delivery`, `Transcript` and `Status`; `Case` and `Requester` format and log without the title, body or reply address",
+          "rmis": [
+            "RMI-SUPPORTFORGE-001"
+          ]
+        },
+        {
+          "description": "The `Desk` interface and the error classes `ErrRetryable`, `ErrCredential`, `ErrRejected` and `ErrUnsupported`, with `Classify`, `Retry` and `RetryAfter`",
+          "rmis": [
+            "RMI-SUPPORTFORGE-002"
+          ]
+        },
+        {
+          "description": "Optional desk extensions: `TicketEraser`, `TicketExporter`, `TicketLinker`, `TicketStatuser` and `TicketReplier`",
+          "rmis": [
+            "RMI-SUPPORTFORGE-002",
+            "RMI-SUPPORTFORGE-019"
+          ]
+        },
+        {
+          "description": "`desktest`, a conformance suite of twelve checks, including that the requester is sent the acknowledgment and nothing else, and that links carry no personal data",
+          "rmis": [
+            "RMI-SUPPORTFORGE-003",
+            "RMI-SUPPORTFORGE-019"
+          ]
+        },
+        {
+          "description": "`memdesk`, an in-memory desk that implements every extension and passes the suite",
+          "rmis": [
+            "RMI-SUPPORTFORGE-003",
+            "RMI-SUPPORTFORGE-019"
+          ]
+        }
+      ]
+    }
+  ]
+}
