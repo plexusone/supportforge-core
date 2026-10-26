@@ -62,8 +62,11 @@ type TicketStatuser interface {
 
 // TicketReplier is implemented by a desk that can send a reply into a
 // ticket's conversation. The body goes to the requester, and responders see
-// it in the ticket. A desk returns [ErrRejected] when the ticket no longer
-// exists or has no address to reply to.
+// it in the ticket. The host passes the case as it holds it, so a desk with
+// no ticket store of its own, such as mail, can address the reply; its reply
+// address is empty once the host has cleared it. A desk returns
+// [ErrRejected] when the ticket no longer exists or there is no address to
+// reply to.
 type TicketReplier interface {
-	Reply(ctx context.Context, d Delivery, body string) error
+	Reply(ctx context.Context, d Delivery, c Case, body string) error
 }

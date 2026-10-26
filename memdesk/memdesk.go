@@ -177,9 +177,11 @@ func (d *Desk) TicketStatus(ctx context.Context, del supportcore.Delivery) (supp
 	return t.Status, nil
 }
 
-// Reply implements [supportcore.TicketReplier]. The reply is emailed to the
-// requester, joins the transcript, and leaves the ticket pending.
-func (d *Desk) Reply(ctx context.Context, del supportcore.Delivery, body string) error {
+// Reply implements [supportcore.TicketReplier]. Like a vendor, the desk
+// replies to the address it holds for the ticket and ignores c. The reply is
+// emailed to the requester, joins the transcript, and leaves the ticket
+// pending.
+func (d *Desk) Reply(ctx context.Context, del supportcore.Delivery, _ supportcore.Case, body string) error {
 	t, err := d.begin(ctx, del)
 	if err != nil {
 		return err

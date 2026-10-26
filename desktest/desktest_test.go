@@ -146,7 +146,9 @@ func (staleStatusDesk) TicketStatus(context.Context, supportcore.Delivery) (supp
 // silentReplyDesk records a reply without sending it.
 type silentReplyDesk struct{ *memdesk.Desk }
 
-func (silentReplyDesk) Reply(context.Context, supportcore.Delivery, string) error { return nil }
+func (silentReplyDesk) Reply(context.Context, supportcore.Delivery, supportcore.Case, string) error {
+	return nil
+}
 
 // keepsTicketsDesk claims erasure but does not erase.
 type keepsTicketsDesk struct{ *memdesk.Desk }

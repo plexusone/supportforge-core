@@ -148,7 +148,7 @@ func TestLinkStatusAndReply(t *testing.T) {
 	if s, err := d.TicketStatus(t.Context(), del); err != nil || s != supportcore.StatusOpen {
 		t.Errorf("TicketStatus = %q, %v", s, err)
 	}
-	if err := d.Reply(t.Context(), del, "Use the export page."); err != nil {
+	if err := d.Reply(t.Context(), del, testCase(), "Use the export page."); err != nil {
 		t.Fatal(err)
 	}
 	tk, ok := d.Ticket(del.TicketID)
@@ -171,10 +171,10 @@ func TestReplyRejected(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := d.Reply(t.Context(), del, "hi"); !errors.Is(err, supportcore.ErrRejected) {
+	if err := d.Reply(t.Context(), del, c, "hi"); !errors.Is(err, supportcore.ErrRejected) {
 		t.Errorf("Reply without an address = %v, want ErrRejected", err)
 	}
-	if err := d.Reply(t.Context(), supportcore.Delivery{TicketID: "missing"}, "hi"); !errors.Is(err, supportcore.ErrRejected) {
+	if err := d.Reply(t.Context(), supportcore.Delivery{TicketID: "missing"}, c, "hi"); !errors.Is(err, supportcore.ErrRejected) {
 		t.Errorf("Reply to a missing ticket = %v, want ErrRejected", err)
 	}
 	d.FailNext(supportcore.ErrCredential)

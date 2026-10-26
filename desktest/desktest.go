@@ -449,7 +449,7 @@ func checkReplies(ctx context.Context, desk supportcore.Desk, v Vendor) error {
 	if err != nil {
 		return err
 	}
-	if err := replier.Reply(ctx, d, markReply); err != nil {
+	if err := replier.Reply(ctx, d, signedInCase("c1"), markReply); err != nil {
 		return fmt.Errorf("Reply: %w", err)
 	}
 	tk, ok := v.Ticket(d)
@@ -463,7 +463,7 @@ func checkReplies(ctx context.Context, desk supportcore.Desk, v Vendor) error {
 		return errors.New("responders cannot see the reply")
 	}
 	missing := supportcore.Delivery{Desk: desk.Name(), TicketID: missingTicket}
-	if err := replier.Reply(ctx, missing, markReply); supportcore.Classify(err) != supportcore.ErrRejected {
+	if err := replier.Reply(ctx, missing, signedInCase("c2"), markReply); supportcore.Classify(err) != supportcore.ErrRejected {
 		return fmt.Errorf("Reply to a ticket that does not exist returned %v; want ErrRejected", err)
 	}
 	return nil
